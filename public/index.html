@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebSocketChat</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --accent: #2f81f7;
+      --incoming: #21262d;
+      --outgoing: #1f6feb;
+      --text: #e6edf3;
+      --muted: #8b949e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: var(--text);
+    }
+
+    .chat-container {
+      background-color: var(--panel);
+      width: 100%;
+      max-width: 600px;
+      height: 90vh;
+      border-radius: 10px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #chat {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message {
+      max-width: 70%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.95em;
+      word-wrap: break-word;
+      opacity: 0;
+      transform: translateY(10px);
+      animation: fadeInUp 0.3s forwards;
+    }
+
+    .message.outgoing {
+      background-color: var(--outgoing);
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 0;
+    }
+
+    .message.incoming {
+      background-color: var(--incoming);
+      color: var(--text);
+      align-self: flex-start;
+      border-bottom-left-radius: 0;
+    }
+
+    .message.info {
+      align-self: center;
+      background: none;
+      color: var(--muted);
+      font-size: 0.8em;
+      text-align: center;
+      box-shadow: none;
+      transform: none;
+      opacity: 1;
+    }
+
+    .input-group {
+      display: flex;
+      padding: 10px;
+      background-color: var(--panel);
+      border-top: 1px solid #30363d;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 20px;
+      background-color: var(--incoming);
+      color: var(--text);
+      font-size: 1em;
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+
+    #messageInput::placeholder {
+      color: var(--muted);
+    }
+
+    #messageInput:focus {
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    #sendBtn {
+      background-color: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      margin-left: 10px;
+      border-radius: 50%;
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    #sendBtn:hover:not(:disabled) {
+      background-color: #1f6feb;
+      transform: scale(1.05);
+    }
+
+    #sendBtn:disabled {
+      background-color: #444c56;
+      cursor: not-allowed;
+    }
+
+    @keyframes fadeInUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div id="chat"></div>
+    <div class="input-group">
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <button id="sendBtn">➤</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io('http://localhost:3000');
+    const chat = document.getElementById('chat');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function appendMessage(msg, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `message ${type}`;
+      div.textContent = msg;
+      chat.appendChild(div);
+      void div.offsetHeight;
+      div.style.animation = 'fadeInUp 0.3s forwards';
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function setInputEnabled(enabled) {
+      messageInput.disabled = !enabled;
+      sendBtn.disabled = !enabled;
+    }
+
+    socket.on('connect', () => {
+      appendMessage(`Connected as ${socket.id}`, 'info');
+      setInputEnabled(true);
+    });
+
+    socket.on('disconnect', (reason) => {
+      appendMessage(`Disconnected: ${reason}`, 'info');
+      setInputEnabled(false);
+    });
+
+    socket.on('connect_error', () => {
+      appendMessage('Connection error. Trying to reconnect...', 'info');
+      setInputEnabled(false);
+    });
+
+    socket.on('connected', (data) => {
+      appendMessage(data.message, 'info');
+    });
+
+    socket.on('disconnected', (data) => {
+      appendMessage(data.message, 'info');
+    });
+
+    socket.on('message', (data) => {
+      appendMessage(`${data}`, 'incoming');
+    });
+
+    sendBtn.addEventListener('click', () => {
+      const msg = messageInput.value.trim();
+      if (msg) {
+        appendMessage(msg, 'outgoing');
+        socket.emit('message', msg);
+        messageInput.value = '';
+      }
+    });
+
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendBtn.click();
+    });
+
+    setInputEnabled(false);
+  </script>
+</body>
+</html>
